@@ -1,5 +1,9 @@
 {
-  "plates": ["AA8092"],
+  "plates": [
+    "AA8092"
+  ],
   "checkEveryMinutes": 3,
-  "remindEveryMinutes": 5
+  "remindEveryMinutes": 5,
+  "activeHours": "08:00-20:30",
+  "utcOffsetHours": 8
 }
