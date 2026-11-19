@@ -1,11 +1,12 @@
 name: Check for fines
 
+# One job stays running for ~5h45m, checking every few minutes
+# (see docs/config.json). The schedule below only makes sure a new
+# job is always queued to take over when the current one ends.
 on:
   schedule:
-    - cron: "*/30 * * * *"   # every 30 minutes (GitHub may delay a few minutes)
-  workflow_dispatch: {}       # "Check now" button on the dashboard
-  push:
-    paths: ["docs/config.json"]  # re-check right after you change the plate
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -17,24 +18,22 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Check FSM and notify
+      - name: Watch FSM and notify
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: python checker/check.py
-
-      - name: Save status for the dashboard
+          LOOP_MINUTES: "345"
+          GIT_PUSH: "1"
         run: |
           git config user.name "fine-watch-bot"
           git config user.email "fine-watch-bot@users.noreply.github.com"
-          git add docs/status.json
-          git diff --cached --quiet && exit 0
-          git commit -m "Status update $(date -u +%FT%TZ)" -q
-          git pull --rebase -q && git push -q
+          python checker/check.py
