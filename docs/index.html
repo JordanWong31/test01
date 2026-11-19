@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fine Watch</title>
+<meta name="description" content="Watches the Macau PSP online ticket service for your car and pushes an alert to your phone.">
+<meta name="theme-color" content="#0b0f17">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b0f17'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='%2334d399' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='4' fill='%2334d399'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230b0f17'/%3E%3Ccircle cx='32' cy='32' r='14' fill='none' stroke='%2334d399' stroke-width='5'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f5f8; --bg2:#e9ecf2; --card:#ffffff; --card-2:#f7f8fb; --line:#e3e6ee;
+  --text:#0d1220; --muted:#5d6577; --faint:#8a92a4;
+  --red:#e5484d; --red-soft:#fde8e8; --red-glow:rgba(229,72,77,.35);
+  --green:#12a66e; --green-soft:#dcf5ea; --green-glow:rgba(18,166,110,.3);
+  --amber:#d98a06; --amber-soft:#fdf1d8;
+  --blue:#3b6cf6; --blue-soft:#e6edff;
+  --shadow:0 1px 2px rgba(13,18,32,.04),0 8px 28px rgba(13,18,32,.07);
+  --radius:22px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b0f17; --bg2:#111725; --card:#131a28; --card-2:#182031; --line:#232c40;
+    --text:#eef1f7; --muted:#9aa3b6; --faint:#6b7489;
+    --red:#ff5d62; --red-soft:rgba(255,93,98,.12); --red-glow:rgba(255,93,98,.45);
+    --green:#34d399; --green-soft:rgba(52,211,153,.12); --green-glow:rgba(52,211,153,.4);
+    --amber:#fbbf24; --amber-soft:rgba(251,191,36,.12);
+    --blue:#7c9cff; --blue-soft:rgba(124,156,255,.13);
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 36px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b0f17; --bg2:#111725; --card:#131a28; --card-2:#182031; --line:#232c40;
+  --text:#eef1f7; --muted:#9aa3b6; --faint:#6b7489;
+  --red:#ff5d62; --red-soft:rgba(255,93,98,.12); --red-glow:rgba(255,93,98,.45);
+  --green:#34d399; --green-soft:rgba(52,211,153,.12); --green-glow:rgba(52,211,153,.4);
+  --amber:#fbbf24; --amber-soft:rgba(251,191,36,.12);
+  --blue:#7c9cff; --blue-soft:rgba(124,156,255,.13);
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 36px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--text);
+  font:15px/1.5 Inter,-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif;
+  -webkit-font-smoothing:antialiased; min-height:100vh; overflow-x:hidden;
+}
+body::before{ /* soft ambient glow that follows status */
+  content:""; position:fixed; inset:-30vh -20vw auto; height:80vh; pointer-events:none; z-index:0;
+  background:radial-gradient(closest-side,var(--glow,transparent),transparent 70%);
+  opacity:.55; transition:background .8s ease;
+}
+.wrap{position:relative; z-index:1; max-width:980px; margin:0 auto; padding:20px 16px 60px}
+header{display:flex; align-items:center; gap:12px; margin-bottom:22px}
+.logo{width:38px;height:38px;border-radius:12px;background:var(--text);display:grid;place-items:center;flex:none}
+.logo svg{width:22px;height:22px}
+.brand h1{font-size:18px;margin:0;letter-spacing:-.01em}
+.brand p{margin:0;color:var(--muted);font-size:12.5px}
+header .sp{flex:1}
+.icon-btn{
+  width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--card);
+  color:var(--text);display:grid;place-items:center;cursor:pointer;transition:transform .15s, background .2s;
+}
+.icon-btn:hover{background:var(--card-2)} .icon-btn:active{transform:scale(.94)}
+.icon-btn svg{width:19px;height:19px}
+
+.grid{display:grid;grid-template-columns:1.35fr 1fr;gap:16px}
+@media (max-width:820px){.grid{grid-template-columns:1fr}}
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:22px; animation:rise .6s cubic-bezier(.2,.8,.2,1) both;
+}
+.card:nth-child(2){animation-delay:.08s}.card:nth-child(3){animation-delay:.16s}.card:nth-child(4){animation-delay:.24s}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 14px;font-weight:600}
+
+/* ---------- hero ---------- */
+.hero{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:center;padding:28px}
+@media (max-width:640px){.hero{grid-template-columns:1fr;text-align:center;justify-items:center;gap:20px;padding:24px 18px}}
+.radar{position:relative;width:190px;height:190px;flex:none}
+.radar .ring{position:absolute;inset:0;border-radius:50%;border:1.5px solid var(--tone);opacity:0;animation:ping 3s cubic-bezier(.2,.6,.3,1) infinite}
+.radar .ring:nth-child(2){animation-delay:1s}.radar .ring:nth-child(3){animation-delay:2s}
+@keyframes ping{0%{transform:scale(.55);opacity:.7}100%{transform:scale(1);opacity:0}}
+.radar .sweep{
+  position:absolute;inset:8px;border-radius:50%;
+  background:conic-gradient(from 0deg,transparent 0 280deg,var(--tone-glow) 360deg);
+  animation:spin 3.2s linear infinite; opacity:.8;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.radar .core{
+  position:absolute;inset:38px;border-radius:50%;background:var(--card);
+  border:2px solid var(--tone);display:grid;place-items:center;
+  box-shadow:0 0 0 8px var(--tone-soft),0 0 40px var(--tone-glow);
+  transition:border-color .6s, box-shadow .6s;
+}
+.radar .core svg{width:52px;height:52px;color:var(--tone)}
+.state-fined .radar .core{animation:throb 1.6s ease-in-out infinite}
+@keyframes throb{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.draw path{stroke-dasharray:60;stroke-dashoffset:60;animation:draw .7s .2s ease forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+
+.plate{
+  display:inline-flex;align-items:center;gap:10px;padding:8px 16px 8px 12px;border-radius:10px;
+  background:#0d0d0f;color:#f4f4f4;border:2px solid #3a3a3f;
+  font:700 26px/1 "JetBrains Mono",ui-monospace,monospace;letter-spacing:.06em;
+  box-shadow:inset 0 0 0 2px #0d0d0f,inset 0 0 0 3px #555,0 6px 18px rgba(0,0,0,.25);
+}
+.plate small{font:600 9px/1.1 Inter,sans-serif;letter-spacing:.04em;color:#bbb;writing-mode:vertical-rl;text-orientation:upright;opacity:.8}
+.plates{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+@media (max-width:640px){.plates{justify-content:center}}
+.plates .plate{cursor:pointer;transition:transform .2s,opacity .2s}
+.plates .plate.dim{opacity:.4;transform:scale(.88)}
+
+.status-chip{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:14px;padding:6px 12px;border-radius:999px;background:var(--tone-soft);color:var(--tone);margin-bottom:8px}
+.status-chip i{width:8px;height:8px;border-radius:50%;background:var(--tone);box-shadow:0 0 0 0 var(--tone-glow);animation:dot 1.8s infinite}
+@keyframes dot{0%{box-shadow:0 0 0 0 var(--tone-glow)}70%{box-shadow:0 0 0 9px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.headline{font-size:clamp(26px,5vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.1;margin:4px 0 8px}
+.sub{color:var(--muted);margin:0 0 18px;max-width:46ch}
+@media (max-width:640px){.sub{margin-inline:auto}}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+@media (max-width:640px){.actions{justify-content:center}}
+
+.btn{
+  appearance:none;border:0;cursor:pointer;font:600 14px/1 Inter,sans-serif;border-radius:12px;padding:12px 16px;
+  display:inline-flex;align-items:center;gap:8px;transition:transform .15s,box-shadow .2s,background .2s,opacity .2s;
+  text-decoration:none;
+}
+.btn svg{width:17px;height:17px}
+.btn:active{transform:scale(.96)}
+.btn.primary{background:var(--text);color:var(--bg)}
+.btn.primary:hover{box-shadow:0 8px 22px rgba(0,0,0,.18)}
+.btn.ghost{background:var(--card-2);color:var(--text);border:1px solid var(--line)}
+.btn.ghost:hover{background:var(--bg2)}
+.btn[disabled]{opacity:.5;pointer-events:none}
+.btn .spin{animation:spin 1s linear infinite}
+
+/* ---------- stats ---------- */
+.stats{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:0;background:none;border:0;box-shadow:none}
+@media (max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:var(--shadow)}
+.stat .k{font-size:12px;color:var(--muted);font-weight:500}
+.stat .v{font-size:21px;font-weight:700;letter-spacing:-.01em;margin-top:4px;font-variant-numeric:tabular-nums}
+.stat .v small{font-size:12px;color:var(--faint);font-weight:500;margin-left:4px}
+.bar{height:4px;border-radius:4px;background:var(--bg2);margin-top:10px;overflow:hidden}
+.bar span{display:block;height:100%;background:var(--tone);border-radius:4px;transition:width 1s linear}
+
+/* ---------- timeline ---------- */
+.timeline{list-style:none;margin:0;padding:0;max-height:380px;overflow:auto;scrollbar-width:thin}
+.timeline li{display:grid;grid-template-columns:18px 1fr auto;gap:12px;align-items:start;padding:10px 0;position:relative;animation:rise .4s both}
+.timeline li::before{content:"";position:absolute;left:8px;top:28px;bottom:-10px;width:2px;background:var(--line)}
+.timeline li:last-child::before{display:none}
+.timeline .d{width:18px;height:18px;border-radius:50%;background:var(--soft);border:2px solid var(--c);margin-top:2px}
+.timeline .t{font-weight:600;font-size:14px}
+.timeline .m{color:var(--muted);font-size:12.5px}
+.timeline .w{color:var(--faint);font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.empty{color:var(--muted);text-align:center;padding:26px 0}
+
+/* ---------- notify ---------- */
+.steps{counter-reset:s;list-style:none;padding:0;margin:0 0 16px;display:grid;gap:12px}
+.steps li{counter-increment:s;display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;font-size:14px}
+.steps li::before{content:counter(s);width:26px;height:26px;border-radius:50%;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center;font-weight:700;font-size:13px}
+.steps a{color:var(--blue);font-weight:600}
+.topic{display:flex;gap:8px;align-items:center;background:var(--card-2);border:1px dashed var(--line);border-radius:12px;padding:10px 12px;margin:2px 0 0;font:600 13px "JetBrains Mono",monospace;word-break:break-all}
+.topic span{flex:1}
+.topic button{border:0;background:none;color:var(--blue);cursor:pointer;font:600 12px Inter,sans-serif;padding:4px}
+.store{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.store a{font-size:12.5px;padding:7px 10px;border-radius:10px;background:var(--card-2);border:1px solid var(--line);color:var(--text);text-decoration:none;font-weight:600}
+
+/* ---------- drawer ---------- */
+.scrim{position:fixed;inset:0;background:rgba(5,8,14,.45);backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .3s;z-index:20}
+.drawer{
+  position:fixed;z-index:21;right:0;top:0;bottom:0;width:min(440px,100%);background:var(--card);border-left:1px solid var(--line);
+  transform:translateX(105%);transition:transform .45s cubic-bezier(.2,.8,.2,1);padding:22px 20px 30px;overflow:auto;
+}
+.open .scrim{opacity:1;pointer-events:auto}.open .drawer{transform:none}
+.drawer h3{margin:0;font-size:20px;letter-spacing:-.01em}
+.drawer .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.field{margin-bottom:18px}
+.field label{display:block;font-weight:600;font-size:13px;margin-bottom:6px}
+.field .hint{color:var(--muted);font-size:12.5px;margin-top:6px}
+.field .hint a{color:var(--blue)}
+input[type=text],input[type=password]{
+  width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card-2);color:var(--text);
+  font:500 15px Inter,sans-serif;outline:none;transition:border-color .2s,box-shadow .2s;
+}
+input:focus{border-color:var(--blue);box-shadow:0 0 0 4px var(--blue-soft)}
+.plate-input{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.plate-input .plate{font-size:18px;padding:6px 10px 6px 12px}
+.plate-input .plate button{background:none;border:0;color:#999;cursor:pointer;font-size:16px;line-height:1;padding:0 0 0 2px}
+.plate-input .plate button:hover{color:#fff}
+.add-row{display:flex;gap:8px}
+.add-row input{font:700 18px "JetBrains Mono",monospace;letter-spacing:.08em;text-transform:uppercase}
+.divider{height:1px;background:var(--line);margin:22px 0}
+.seg{display:flex;background:var(--card-2);border:1px solid var(--line);border-radius:12px;padding:3px}
+.seg button{flex:1;border:0;background:none;color:var(--muted);padding:8px;border-radius:9px;font:600 13px Inter,sans-serif;cursor:pointer}
+.seg button.on{background:var(--card);color:var(--text);box-shadow:var(--shadow)}
+
+/* ---------- toast ---------- */
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,140%);background:var(--text);color:var(--bg);padding:12px 18px;border-radius:14px;font-weight:600;font-size:14px;z-index:40;transition:transform .45s cubic-bezier(.2,.9,.3,1.3),opacity .3s;max-width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none}
+.toast.show{transform:translate(-50%,0);opacity:1}
+
+footer{margin-top:26px;color:var(--faint);font-size:12px;text-align:center}
+footer a{color:inherit}
+
+.state-fined{--tone:var(--red);--tone-soft:var(--red-soft);--tone-glow:var(--red-glow);--glow:var(--red-glow)}
+.state-clear{--tone:var(--green);--tone-soft:var(--green-soft);--tone-glow:var(--green-glow);--glow:var(--green-glow)}
+.state-pending,.state-error,.state-unregistered{--tone:var(--amber);--tone-soft:var(--amber-soft);--tone-glow:rgba(217,138,6,.3);--glow:rgba(217,138,6,.25)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body class="state-pending">
+<div class="wrap">
+  <header>
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="var(--bg)" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.6" fill="var(--bg)"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div>
+    <div class="brand"><h1>Fine Watch</h1><p>罰單監察 · Macau PSP ticket alerts</p></div>
+    <div class="sp"></div>
+    <button class="icon-btn" id="themeBtn" title="Theme" aria-label="Toggle theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  </header>
+
+  <main class="grid">
+    <section class="card hero">
+      <div class="radar" aria-hidden="true">
+        <div class="ring"></div><div class="ring"></div><div class="ring"></div>
+        <div class="sweep"></div>
+        <div class="core" id="coreIcon"></div>
+      </div>
+      <div>
+        <div class="plates" id="plateTabs"></div>
+        <div class="status-chip"><i></i><span id="chip">Waiting</span></div>
+        <div class="headline" id="headline">Waiting for the first check</div>
+        <p class="sub" id="sub">The checker runs every 30 minutes in the cloud. Results show up here automatically.</p>
+        <div class="actions">
+          <button class="btn primary" id="checkNow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg><span>Check now</span></button>
+          <a class="btn ghost" id="fsmLink" target="_blank" rel="noopener" href="https://www.fsm.gov.mo/webticket/Webform1.aspx?carClass=L&Lang=C"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 3h7v7M21 3l-9 9M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>Open FSM site</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="card stats">
+      <div class="stat"><div class="k">Last checked</div><div class="v" id="sLast">—</div></div>
+      <div class="stat"><div class="k">Next check in</div><div class="v" id="sNext">—</div><div class="bar"><span id="sBar" style="width:0"></span></div></div>
+      <div class="stat"><div class="k">Status since</div><div class="v" id="sSince">—</div></div>
+      <div class="stat"><div class="k">Checks logged</div><div class="v" id="sCount">0</div></div>
+    </section>
+
+    <section class="card">
+      <h2>Recent checks</h2>
+      <ul class="timeline" id="timeline"><li class="empty" style="display:block">No checks yet.</li></ul>
+    </section>
+
+    <section class="card">
+      <h2>Phone alerts</h2>
+      <ol class="steps">
+        <li><div>Install the free <b>ntfy</b> app.
+          <div class="store"><a href="https://apps.apple.com/app/ntfy/id1625396347" target="_blank" rel="noopener">iPhone</a><a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank" rel="noopener">Android</a></div></div></li>
+        <li><div>Tap <b>+</b> in the app and subscribe to this topic:
+          <div class="topic"><span id="topicTxt">Set it in ⚙︎ Settings</span><button id="copyTopic">Copy</button></div></div></li>
+        <li><div>Send a test to make sure your phone buzzes.</div></li>
+      </ol>
+      <button class="btn ghost" id="testBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg>Send test notification</button>
+    </section>
+  </main>
+
+  <footer>Results come from the <a href="https://www.fsm.gov.mo/webticket/Webform1.aspx?carClass=L&Lang=C" target="_blank" rel="noopener">Macau PSP online ticket service</a> and are for reference only. 查詢結果僅供參考。</footer>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Settings">
+  <div class="top"><h3>Settings</h3><button class="icon-btn" id="closeDrawer" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+
+  <div class="field">
+    <label>Car plates to watch · 車牌編號</label>
+    <div class="plate-input" id="plateEdit"></div>
+    <div class="add-row"><input type="text" id="plateNew" maxlength="10" placeholder="AA8092" autocomplete="off" autocapitalize="characters"><button class="btn ghost" id="plateAdd">Add</button></div>
+    <div class="hint">Letters and numbers only, e.g. MA-55-19 → MA5519.</div>
+  </div>
+
+  <div class="field">
+    <label>Remind me again every</label>
+    <div class="seg" id="remindSeg"><button data-h="6">6 h</button><button data-h="12">12 h</button><button data-h="24">Day</button><button data-h="168">Week</button></div>
+    <div class="hint">You're always alerted the moment 有違例紀錄 first appears; this sets how often you're reminded while it stays.</div>
+  </div>
+
+  <button class="btn primary" id="saveCfg" style="width:100%;justify-content:center">Save &amp; check now</button>
+  <div class="hint" id="saveHint" style="margin-top:8px;color:var(--muted);font-size:12.5px"></div>
+
+  <div class="divider"></div>
+
+  <div class="field">
+    <label>ntfy topic</label>
+    <input type="text" id="topicIn" placeholder="fsm-fines-…" autocomplete="off">
+    <div class="hint">Must match the <code>NTFY_TOPIC</code> secret in GitHub. Stored only in this browser.</div>
+  </div>
+  <div class="field">
+    <label>GitHub access key</label>
+    <input type="password" id="tokenIn" placeholder="github_pat_…" autocomplete="off">
+    <div class="hint">Needed to change plates and use <b>Check now</b> from this page. Use a fine-grained token with <b>Contents</b> + <b>Actions</b> read/write on this repo only. Stored only in this browser.</div>
+  </div>
+  <div class="field">
+    <label>Repository</label>
+    <input type="text" id="repoIn" placeholder="username/fine-watch" autocomplete="off">
+  </div>
+  <button class="btn ghost" id="saveLocal" style="width:100%;justify-content:center">Save these on this device</button>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const LS = {
+    get(k, d = "") { try { return localStorage.getItem("fw." + k) ?? d } catch { return d } },
+    set(k, v) { try { localStorage.setItem("fw." + k, v) } catch {} },
+  };
+  const CHECK_EVERY_MIN = 30;
+  const FSM = "https://www.fsm.gov.mo/webticket/Webform1.aspx?carClass=L&Lang=C";
+
+  // Accept settings from the link: #topic=...&repo=...
+  function readHash() {
+    const hp = new URLSearchParams(location.hash.slice(1));
+    let got = false;
+    for (const k of ["topic", "repo"]) if (hp.get(k)) { LS.set(k, hp.get(k)); got = true; }
+    if (got) history.replaceState(null, "", location.pathname + location.search);
+    return got;
+  }
+  readHash();
+  addEventListener("hashchange", () => { if (readHash()) { st.topic = LS.get("topic"); st.repo = LS.get("repo") || st.repo; renderTopic(); load(); } });
+
+  function guessRepo() {
+    const m = location.hostname.match(/^([^.]+)\.github\.io$/);
+    const seg = location.pathname.split("/").filter(Boolean)[0];
+    return m && seg ? `${m[1]}/${seg}` : "";
+  }
+  const st = {
+    status: null, config: null, selected: LS.get("selected"),
+    topic: LS.get("topic"), token: LS.get("token"), repo: LS.get("repo") || guessRepo(),
+  };
+
+  // ---------- theme ----------
+  const applyTheme = t => { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; };
+  applyTheme(LS.get("theme"));
+  $("#themeBtn").onclick = () => {
+    const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+    const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
+    const next = cur === "dark" ? "light" : "dark";
+    applyTheme(next); LS.set("theme", next);
+  };
+
+  // ---------- helpers ----------
+  const toastEl = $("#toast"); let tt;
+  function toast(msg) { toastEl.textContent = msg; toastEl.classList.add("show"); clearTimeout(tt); tt = setTimeout(() => toastEl.classList.remove("show"), 3200); }
+  const pretty = p => { const m = /^([A-Z]{1,2})(\d{2})(\d{2})$/.exec(p); return m ? `${m[1]}-${m[2]}-${m[3]}` : p; };
+  const norm = p => (p || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  function ago(iso) {
+    if (!iso) return "—";
+    const s = (Date.now() - new Date(iso)) / 1000;
+    if (s < 60) return "just now";
+    if (s < 3600) return Math.floor(s / 60) + " min ago";
+    if (s < 86400) return Math.floor(s / 3600) + " h ago";
+    return Math.floor(s / 86400) + " d ago";
+  }
+  const fmtTime = iso => new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const fmtDate = iso => iso ? new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" }) : "—";
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  const ICONS = {
+    fined: `<svg class="draw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19z"/><path d="M12 10v4M12 17.2v.1"/></svg>`,
+    clear: `<svg class="draw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
+    pending: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>`,
+    unregistered: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5M12 16.5v.1"/></svg>`,
+  };
+  const COPY = {
+    fined: { chip: "有違例紀錄", head: "You have a traffic fine", sub: "The FSM site shows a violation record for this car. Open the FSM site to see the details and pay." },
+    clear: { chip: "No fines", head: "All clear", sub: "No violation records found. We'll keep watching and alert your phone the moment that changes." },
+    pending: { chip: "Waiting", head: "Waiting for the first check", sub: "The checker runs every 30 minutes in the cloud. Results show up here automatically." },
+    unregistered: { chip: "沒有登記", head: "Plate not found", sub: "The FSM site says this plate isn't registered. Check the number in Settings." },
+  };
+
+  // ---------- render ----------
+  function plateList() {
+    const fromCfg = (st.config?.plates || []).map(norm);
+    const fromSt = Object.keys(st.status?.plates || {});
+    return [...new Set([...fromCfg, ...fromSt])];
+  }
+  function current() {
+    const list = plateList();
+    if (!list.includes(st.selected)) st.selected = list[0] || "";
+    return st.status?.plates?.[st.selected] || { plate: st.selected, display: pretty(st.selected), result: "pending", history: [] };
+  }
+
+  let lastResult = null;
+  function render() {
+    const list = plateList();
+    const p = current();
+    const r = COPY[p.result] ? p.result : "pending";
+    document.body.className = "state-" + r;
+
+    $("#plateTabs").innerHTML = list.map(x =>
+      `<div class="plate ${x === st.selected ? "" : "dim"}" data-p="${esc(x)}"><small>MACAU</small>${esc(pretty(x))}</div>`).join("") ||
+      `<div class="plate"><small>MACAU</small>— — —</div>`;
+    $("#plateTabs").querySelectorAll("[data-p]").forEach(el => el.onclick = () => { st.selected = el.dataset.p; LS.set("selected", st.selected); render(); });
+
+    if (r !== lastResult) { $("#coreIcon").innerHTML = ICONS[r]; lastResult = r; }
+    $("#chip").textContent = COPY[r].chip;
+    $("#headline").textContent = COPY[r].head;
+    let sub = COPY[r].sub;
+    if (p.errors >= 2) sub += ` (The last ${p.errors} checks couldn't reach the FSM site; showing the last known result.)`;
+    $("#sub").textContent = sub;
+
+    $("#sLast").textContent = ago(p.lastChecked);
+    $("#sSince").textContent = fmtDate(p.since);
+    $("#sCount").textContent = (p.history || []).length;
+    tick();
+
+    const h = (p.history || []).slice(0, 60);
+    const color = { fined: "var(--red)", clear: "var(--green)" };
+    const soft = { fined: "var(--red-soft)", clear: "var(--green-soft)" };
+    const label = { fined: "有違例紀錄 · Fine found", clear: "No fines", unregistered: "Plate not registered", error: "Couldn't reach FSM", unknown: "Unexpected page" };
+    $("#timeline").innerHTML = h.length ? h.map((e, i) => `
+      <li style="--c:${color[e.result] || "var(--amber)"};--soft:${soft[e.result] || "var(--amber-soft)"};animation-delay:${Math.min(i, 10) * 40}ms">
+        <span class="d"></span>
+        <div><div class="t">${esc(label[e.result] || e.result)}</div>${e.result === "error" || e.result === "unknown" ? `<div class="m">${esc(e.text)}</div>` : ""}</div>
+        <span class="w">${fmtTime(e.at)}</span></li>`).join("")
+      : `<li class="empty" style="display:block">No checks yet.</li>`;
+  }
+
+  function tick() {
+    const p = current();
+    if (!p.lastChecked) { $("#sNext").innerHTML = "—"; $("#sBar").style.width = "0"; return; }
+    const period = CHECK_EVERY_MIN * 60e3;
+    const elapsed = Date.now() - new Date(p.lastChecked);
+    const left = period - elapsed;
+    $("#sNext").innerHTML = left > 0 ? `${Math.ceil(left / 60e3)}<small>min</small>` : `soon<small>any minute</small>`;
+    $("#sBar").style.width = Math.min(100, Math.max(0, elapsed / period * 100)) + "%";
+    $("#sLast").textContent = ago(p.lastChecked);
+  }
+
+  // ---------- data ----------
+  async function getJSON(name) {
+    // Prefer the GitHub API when we know the repo (always fresh); fall back to the published file.
+    if (st.repo) {
+      try {
+        const r = await fetch(`https://api.github.com/repos/${st.repo}/contents/docs/${name}?t=${Date.now()}`, {
+          headers: { Accept: "application/vnd.github.raw+json", ...(st.token ? { Authorization: "Bearer " + st.token } : {}) },
+          cache: "no-store",
+        });
+        if (r.ok) return await r.json();
+      } catch {}
+    }
+    const r = await fetch(`${name}?t=${Date.now()}`, { cache: "no-store" });
+    if (!r.ok) throw new Error(name + " " + r.status);
+    return r.json();
+  }
+  async function load() {
+    try { st.config = await getJSON("config.json"); } catch {}
+    try { st.status = await getJSON("status.json"); } catch {}
+    render();
+  }
+
+  // ---------- github actions ----------
+  async function gh(path, opts = {}) {
+    if (!st.token || !st.repo) { openDrawer(); throw new Error("Add your GitHub access key and repository in Settings first."); }
+    const r = await fetch(`https://api.github.com/repos/${st.repo}${path}`, {
+      ...opts, headers: { Accept: "application/vnd.github+json", Authorization: "Bearer " + st.token, ...(opts.headers || {}) },
+    });
+    if (!r.ok) { let m = r.status + ""; try { m = (await r.json()).message || m } catch {} throw new Error("GitHub: " + m); }
+    return r.status === 204 ? null : r.json();
+  }
+
+  let watching = null;
+  function watchForUpdate() {
+    const before = st.status?.updated;
+    let n = 0; clearInterval(watching);
+    watching = setInterval(async () => {
+      n++;
+      try { st.status = await getJSON("status.json"); } catch {}
+      if (st.status?.updated !== before) {
+        clearInterval(watching); setBusy(false); render();
+        const p = current();
+        toast(p.result === "fined" ? "🚨 Check done: 有違例紀錄" : p.result === "clear" ? "✅ Check done: no fines" : "Check done");
+      } else if (n > 30) { clearInterval(watching); setBusy(false); toast("Still running on GitHub; results will appear shortly."); }
+    }, 8000);
+  }
+  function setBusy(b) {
+    const btn = $("#checkNow"); btn.disabled = b;
+    btn.querySelector("svg").classList.toggle("spin", b);
+    btn.querySelector("span").textContent = b ? "Checking…" : "Check now";
+  }
+  $("#checkNow").onclick = async () => {
+    try {
+      setBusy(true);
+      await gh("/actions/workflows/check.yml/dispatches", { method: "POST", body: JSON.stringify({ ref: "main" }) });
+      toast("Checking the FSM site… (about 30–60 s)");
+      watchForUpdate();
+    } catch (e) { setBusy(false); toast(e.message); }
+  };
+
+  // ---------- notifications ----------
+  function renderTopic() {
+    $("#topicTxt").textContent = st.topic || "Set it in ⚙︎ Settings";
+    $("#topicIn").value = st.topic; $("#tokenIn").value = st.token; $("#repoIn").value = st.repo;
+  }
+  $("#copyTopic").onclick = async () => {
+    if (!st.topic) return openDrawer();
+    try { await navigator.clipboard.writeText(st.topic); toast("Topic copied"); } catch { toast(st.topic); }
+  };
+  $("#testBtn").onclick = async () => {
+    if (!st.topic) { openDrawer(); return toast("Add your ntfy topic in Settings first."); }
+    const p = current();
+    try {
+      const r = await fetch("https://ntfy.sh/", {
+        method: "POST",
+        body: JSON.stringify({
+          topic: st.topic, title: "🔔 Fine Watch test", priority: 4, tags: ["car"],
+          message: `Notifications work! You'll be alerted here if ${p.display || "your car"} gets a fine.`, click: FSM,
+        }),
+      });
+      if (!r.ok) throw new Error(r.status);
+      toast("Test sent. Check your phone 📱");
+    } catch (e) { toast("Couldn't send test: " + e.message); }
+  };
+
+  // ---------- settings drawer ----------
+  let draft = [], remind = 24;
+  function openDrawer() {
+    draft = plateList(); remind = Number(st.config?.remindEveryHours || 24);
+    renderDraft(); renderTopic();
+    document.body.parentElement.classList.add("open");
+  }
+  function closeDrawer() { document.documentElement.classList.remove("open"); }
+  $("#settingsBtn").onclick = openDrawer; $("#closeDrawer").onclick = closeDrawer; $("#scrim").onclick = closeDrawer;
+  document.addEventListener("keydown", e => e.key === "Escape" && closeDrawer());
+
+  function renderDraft() {
+    $("#plateEdit").innerHTML = draft.map((p, i) => `<div class="plate"><small>MACAU</small>${esc(pretty(p))}<button data-i="${i}" aria-label="Remove">×</button></div>`).join("");
+    $("#plateEdit").querySelectorAll("button").forEach(b => b.onclick = () => { draft.splice(+b.dataset.i, 1); renderDraft(); });
+    $("#remindSeg").querySelectorAll("button").forEach(b => b.classList.toggle("on", +b.dataset.h === remind));
+  }
+  $("#remindSeg").onclick = e => { if (e.target.dataset.h) { remind = +e.target.dataset.h; renderDraft(); } };
+  const addPlate = () => {
+    const v = norm($("#plateNew").value);
+    if (v.length < 3) return toast("Enter a plate like AA8092");
+    if (!draft.includes(v)) draft.push(v);
+    $("#plateNew").value = ""; renderDraft();
+  };
+  $("#plateAdd").onclick = addPlate;
+  $("#plateNew").addEventListener("keydown", e => e.key === "Enter" && addPlate());
+
+  $("#saveLocal").onclick = () => {
+    st.topic = $("#topicIn").value.trim(); st.token = $("#tokenIn").value.trim(); st.repo = $("#repoIn").value.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "");
+    LS.set("topic", st.topic); LS.set("token", st.token); LS.set("repo", st.repo);
+    renderTopic(); toast("Saved on this device"); load();
+  };
+
+  $("#saveCfg").onclick = async () => {
+    const pending = norm($("#plateNew").value); if (pending && !draft.includes(pending)) draft.push(pending);
+    if (!draft.length) return toast("Add at least one plate");
+    const btn = $("#saveCfg"); btn.disabled = true; $("#saveHint").textContent = "Saving to GitHub…";
+    try {
+      const cur = await gh("/contents/docs/config.json");
+      const cfg = { plates: draft, remindEveryHours: remind };
+      const body = JSON.stringify(cfg, null, 2) + "\n";
+      await gh("/contents/docs/config.json", {
+        method: "PUT",
+        body: JSON.stringify({ message: "Update watched plates", sha: cur.sha, content: btoa(unescape(encodeURIComponent(body))) }),
+      });
+      st.config = cfg; st.selected = draft[0]; render();
+      $("#saveHint").textContent = "Saved. A fresh check is running now.";
+      closeDrawer(); setBusy(true); toast("Saved. Checking your plates…"); watchForUpdate();
+    } catch (e) { $("#saveHint").textContent = e.message; }
+    btn.disabled = false;
+  };
+
+  // ---------- go ----------
+  renderTopic();
+  load();
+  setInterval(tick, 15e3);
+  setInterval(() => { if (!watching || document.hidden) load(); }, 60e3);
+  document.addEventListener("visibilitychange", () => !document.hidden && load());
+})();
+</script>
+</body>
+</html>
