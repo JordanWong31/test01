@@ -6,8 +6,13 @@
       "result": "fined",
       "since": "2026-11-19T06:25:25+00:00",
       "lastNotified": "2026-11-19T06:38:41+00:00",
-      "errors": 1,
+      "errors": 0,
       "history": [
+        {
+          "at": "2026-11-19T06:42:44+00:00",
+          "result": "fined",
+          "text": "有違例紀錄"
+        },
         {
           "at": "2026-11-19T06:38:41+00:00",
           "result": "error",
@@ -19,14 +24,14 @@
           "text": "有違例紀錄"
         }
       ],
-      "lastChecked": "2026-11-19T06:38:41+00:00",
-      "lastText": "TimeoutError: The read operation timed out",
-      "lastSuccess": "2026-11-19T06:25:25+00:00",
+      "lastChecked": "2026-11-19T06:42:44+00:00",
+      "lastText": "有違例紀錄",
+      "lastSuccess": "2026-11-19T06:42:44+00:00",
       "reminders": 1
     }
   },
-  "updated": "2026-11-19T06:38:41+00:00",
+  "updated": "2026-11-19T06:42:44+00:00",
   "checkEveryMinutes": 3.0,
   "remindEveryMinutes": 5.0,
-  "running": false
+  "running": true
 }
