@@ -42,13 +42,25 @@ STATUS_PATH = os.path.join(ROOT, "docs", "status.json")
 START_URL = "https://www.fsm.gov.mo/webticket/Webform1.aspx?carClass=L&Lang=C"
 FINED_TEXT = "有違例紀錄"
 HISTORY_LIMIT = 300
-ERROR_ALERT_AFTER = 20      # consecutive failed checks before one warning
+ERROR_ALERT_AFTER = 30      # consecutive failed checks (~30 min) before one warning
 TICK_SECONDS = 20           # how often the loop wakes up to read control messages
 PUSH_EVERY_MINUTES = 10     # dashboard refresh cadence when nothing changes
 
 SERVER = os.environ.get("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
 TOPIC = os.environ.get("NTFY_TOPIC", "").strip()
 CONTROL_TOPIC = TOPIC + "-control" if TOPIC else ""
+
+
+def dashboard_url():
+    """https://<owner>.github.io/<repo>/ (GitHub Actions sets GITHUB_REPOSITORY)."""
+    url = os.environ.get("DASHBOARD_URL", "").strip()
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    if not url and "/" in repo:
+        owner, name = repo.split("/", 1)
+        url = f"https://{owner.lower()}.github.io/{name}/"
+    if url and TOPIC:
+        url += "#topic=" + TOPIC
+    return url
 
 
 # ---------------------------------------------------------------- helpers
@@ -98,7 +110,22 @@ def _span(page, span_id):
     return re.sub(r"<[^>]+>", "", html.unescape(m.group(1))).strip() if m else ""
 
 
-def lookup(plate):
+def lookup(plate, attempts=4):
+    """Look up a plate, retrying on network timeouts (the FSM server is
+    sometimes slow to answer overseas servers)."""
+    last = None
+    for i in range(attempts):
+        try:
+            return _lookup_once(plate)
+        except Exception as e:
+            last = e
+            log(f"  attempt {i + 1}/{attempts} failed: {type(e).__name__}: {e}")
+            if i < attempts - 1:
+                time.sleep(5 * (i + 1))
+    raise last
+
+
+def _lookup_once(plate):
     """Return dict(result=fined|clear|unregistered|unknown, text=...)."""
     opener = urllib.request.build_opener(
         urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
@@ -106,11 +133,11 @@ def lookup(plate):
         ("User-Agent", "Mozilla/5.0 (Macintosh) FineWatch/1.1 personal plate check"),
         ("Accept-Language", "zh-HK,zh;q=0.9,en;q=0.8"),
     ]
-    page = opener.open(START_URL, timeout=30).read().decode("utf-8", "replace")
+    page = opener.open(START_URL, timeout=45).read().decode("utf-8", "replace")
     form = _hidden_fields(page)
     form.update({"resW": "1920", "resH": "1080", "Calculator": plate,
                  "btnOk": "確  定", "Textbox1": ""})
-    resp = opener.open(START_URL, data=urllib.parse.urlencode(form).encode(), timeout=30)
+    resp = opener.open(START_URL, data=urllib.parse.urlencode(form).encode(), timeout=45)
     result = resp.read().decode("utf-8", "replace")
 
     if FINED_TEXT in result:
@@ -130,12 +157,15 @@ def notify(title, message, priority=3, tags=(), with_stop=False):
         log("  (NTFY_TOPIC not set, skipping notification)")
         return False
     actions = [{"action": "view", "label": "Open FSM site", "url": START_URL}]
+    dash = dashboard_url()
+    if dash:
+        actions.insert(0, {"action": "view", "label": "Open dashboard", "url": dash})
     if with_stop:
         actions.insert(0, {"action": "http", "label": "Stop reminders", "method": "POST",
                            "url": f"{SERVER}/{CONTROL_TOPIC}", "body": "stop", "clear": True})
     payload = json.dumps({"topic": TOPIC, "title": title, "message": message,
                           "priority": priority, "tags": list(tags),
-                          "click": START_URL, "actions": actions}).encode()
+                          "click": dash or START_URL, "actions": actions}).encode()
     req = urllib.request.Request(SERVER, data=payload, headers={"Content-Type": "application/json"})
     for attempt in range(3):
         try:
@@ -311,7 +341,9 @@ def main():
             st = status["plates"].setdefault(plate, {
                 "plate": plate, "display": pretty_plate(plate), "result": "pending",
                 "since": None, "lastNotified": None, "stopped": None, "errors": 0, "history": []})
-            if force_check or minutes_since(st.get("lastChecked")) >= check_every - 0.1:
+            maybe_remind(st, cfg, dry)  # never let a slow FSM check delay a reminder
+            wait = check_every if st.get("errors", 0) == 0 else min(1.0, check_every)
+            if force_check or minutes_since(st.get("lastChecked")) >= wait - 0.1:
                 dirty |= check_plate(plate, st, cfg, dry)
             maybe_remind(st, cfg, dry)
 
