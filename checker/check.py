@@ -33,7 +33,7 @@ import sys
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(ROOT, "docs", "config.json")
@@ -76,6 +76,19 @@ def minutes_since(stamp):
     if not stamp:
         return float("inf")
     return (now() - datetime.fromisoformat(stamp)).total_seconds() / 60
+
+
+def active_now(cfg, at=None):
+    """True inside the daily active window, e.g. "08:00-20:30" Macau time (UTC+8).
+    Outside it nothing is checked and nothing is sent."""
+    window = cfg.get("activeHours", "")
+    if not window:
+        return True
+    tz = timezone(timedelta(hours=float(cfg.get("utcOffsetHours", 8))))
+    local = (at or now()).astimezone(tz)
+    start, end = [int(h) * 60 + int(m) for h, m in (t.split(":") for t in window.split("-"))]
+    minute = local.hour * 60 + local.minute
+    return start <= minute < end if start < end else (minute >= start or minute < end)
 
 
 def normalize_plate(p):
@@ -319,6 +332,12 @@ def main():
         status["checkEveryMinutes"] = check_every
         status["remindEveryMinutes"] = float(cfg.get("remindEveryMinutes", 5))
         status["running"] = loop_minutes > 0
+        status["activeHours"] = cfg.get("activeHours", "")
+        active = active_now(cfg)
+        if active and status.get("quiet"):
+            log("Quiet hours over - checking now")
+            force_check = True
+        status["quiet"] = not active
         dirty = False
 
         for cmd in read_control(status):
@@ -337,7 +356,7 @@ def main():
                     st["stopped"] = None
                     st["lastNotified"] = None  # remind right away
 
-        for plate in plates:
+        for plate in plates if active else []:
             st = status["plates"].setdefault(plate, {
                 "plate": plate, "display": pretty_plate(plate), "result": "pending",
                 "since": None, "lastNotified": None, "stopped": None, "errors": 0, "history": []})
