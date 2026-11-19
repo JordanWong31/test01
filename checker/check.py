@@ -2,15 +2,25 @@
 """Fine Watch checker.
 
 Looks up each plate in docs/config.json on the Macau PSP (FSM) online
-ticket service, records the result in docs/status.json, and sends a phone
-push through ntfy.sh when the result is 有違例紀錄 (has violation records).
+ticket service and records the result in docs/status.json.
 
-Only the Python standard library is used, so no install step is needed.
+  * No record          -> no notification.
+  * 有違例紀錄 appears  -> urgent phone push immediately (ntfy.sh),
+                          then a reminder every `remindEveryMinutes`
+                          until you press "Stop reminders".
+
+Control messages (no password needed) are read from the ntfy topic
+"<NTFY_TOPIC>-control":  stop | resume | check
+The notification's "Stop reminders" button and the dashboard post them.
+
+Only the Python standard library is used.
 
 Environment:
-  NTFY_TOPIC   ntfy topic to push to (required to send notifications)
-  NTFY_SERVER  defaults to https://ntfy.sh
-  DRY_RUN=1    check and print, but do not notify or write files
+  NTFY_TOPIC     ntfy topic to push to (required for notifications)
+  NTFY_SERVER    defaults to https://ntfy.sh
+  LOOP_MINUTES   keep running this long (0 = check once and exit)
+  GIT_PUSH=1     commit + push docs/status.json while looping
+  DRY_RUN=1      check and print only
 """
 
 import html
@@ -18,6 +28,7 @@ import http.cookiejar
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -28,24 +39,31 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(ROOT, "docs", "config.json")
 STATUS_PATH = os.path.join(ROOT, "docs", "status.json")
 
-BASE = "https://www.fsm.gov.mo/webticket/"
-START_URL = BASE + "Webform1.aspx?carClass=L&Lang=C"
-PUBLIC_URL = START_URL  # link opened when the notification is tapped
-
+START_URL = "https://www.fsm.gov.mo/webticket/Webform1.aspx?carClass=L&Lang=C"
 FINED_TEXT = "有違例紀錄"
 HISTORY_LIMIT = 300
-ERROR_ALERT_AFTER = 8  # consecutive failed checks (~4h at 30 min) before warning
+ERROR_ALERT_AFTER = 20      # consecutive failed checks before one warning
+TICK_SECONDS = 20           # how often the loop wakes up to read control messages
+PUSH_EVERY_MINUTES = 10     # dashboard refresh cadence when nothing changes
+
+SERVER = os.environ.get("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
+TOPIC = os.environ.get("NTFY_TOPIC", "").strip()
+CONTROL_TOPIC = TOPIC + "-control" if TOPIC else ""
 
 
-def now_iso():
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+# ---------------------------------------------------------------- helpers
+def now():
+    return datetime.now(timezone.utc)
 
 
-def hours_since(iso):
-    if not iso:
+def iso(dt=None):
+    return (dt or now()).replace(microsecond=0).isoformat()
+
+
+def minutes_since(stamp):
+    if not stamp:
         return float("inf")
-    then = datetime.fromisoformat(iso)
-    return (datetime.now(timezone.utc) - then).total_seconds() / 3600
+    return (now() - datetime.fromisoformat(stamp)).total_seconds() / 60
 
 
 def normalize_plate(p):
@@ -53,88 +71,8 @@ def normalize_plate(p):
 
 
 def pretty_plate(p):
-    # AA8092 -> AA-80-92 (Macau style); leave anything unusual as-is
     m = re.fullmatch(r"([A-Z]{1,2})(\d{2})(\d{2})", p)
     return f"{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else p
-
-
-def hidden_fields(page):
-    fields = {}
-    for name, value in re.findall(
-        r'<input[^>]+type="hidden"[^>]+name="([^"]+)"[^>]*value="([^"]*)"', page
-    ):
-        fields[name] = html.unescape(value)
-    return fields
-
-
-def span_text(page, span_id):
-    m = re.search(r'<span[^>]+id="%s"[^>]*>(.*?)</span>' % re.escape(span_id), page, re.S)
-    if not m:
-        return ""
-    return re.sub(r"<[^>]+>", "", html.unescape(m.group(1))).strip()
-
-
-def lookup(plate):
-    """Return dict(result=..., text=...). result is fined | clear | unknown."""
-    jar = http.cookiejar.CookieJar()
-    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
-    opener.addheaders = [
-        ("User-Agent", "Mozilla/5.0 (Macintosh) FineWatch/1.0 personal plate check"),
-        ("Accept-Language", "zh-HK,zh;q=0.9,en;q=0.8"),
-    ]
-
-    page = opener.open(START_URL, timeout=30).read().decode("utf-8", "replace")
-    form = hidden_fields(page)
-    form.update({
-        "resW": "1920",
-        "resH": "1080",
-        "Calculator": plate,
-        "btnOk": "確  定",
-        "Textbox1": "",
-    })
-    data = urllib.parse.urlencode(form).encode()
-    resp = opener.open(START_URL, data=data, timeout=30)
-    result_page = resp.read().decode("utf-8", "replace")
-
-    red = span_text(result_page, "lbRed")
-    if FINED_TEXT in result_page:
-        return {"result": "fined", "text": red or FINED_TEXT}
-    if "沒有登記" in result_page:
-        return {"result": "unregistered", "text": "輸入的車牌編號沒有登記 (plate not registered)"}
-    if "WebForm2.aspx" in resp.geturl() and red:
-        # Result page reached and the result line says something else
-        # (e.g. 沒有違例紀錄) -> no fines.
-        return {"result": "clear", "text": red}
-    snippet = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", result_page))
-    snippet = re.sub(r"function.*", "", snippet).strip()[:160]
-    return {"result": "unknown", "text": snippet or "Unexpected page"}
-
-
-def notify(title, message, priority="default", tags="", url=PUBLIC_URL):
-    topic = os.environ.get("NTFY_TOPIC", "").strip()
-    if not topic:
-        print("  (NTFY_TOPIC not set, skipping notification)")
-        return False
-    server = os.environ.get("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
-    payload = json.dumps({
-        "topic": topic,
-        "title": title,
-        "message": message,
-        "priority": {"min": 1, "low": 2, "default": 3, "high": 4, "urgent": 5}[priority],
-        "tags": [t for t in tags.split(",") if t],
-        "click": url,
-        "actions": [{"action": "view", "label": "Open FSM site", "url": url}],
-    }).encode()
-    req = urllib.request.Request(server, data=payload, headers={"Content-Type": "application/json"})
-    for attempt in range(3):
-        try:
-            urllib.request.urlopen(req, timeout=20).read()
-            print(f"  -> notified: {title}")
-            return True
-        except Exception as e:  # network hiccup, retry
-            print(f"  notify attempt {attempt + 1} failed: {e}")
-            time.sleep(3)
-    return False
 
 
 def load_json(path, default):
@@ -145,84 +83,256 @@ def load_json(path, default):
         return default
 
 
-def main():
-    dry = os.environ.get("DRY_RUN") == "1"
-    config = load_json(CONFIG_PATH, {"plates": []})
-    status = load_json(STATUS_PATH, {"plates": {}})
-    remind_hours = float(config.get("remindEveryHours", 24))
-    checked_at = now_iso()
+def log(*a):
+    print(datetime.now().strftime("%H:%M:%S"), *a, flush=True)
 
-    plates = [normalize_plate(p) for p in config.get("plates", []) if normalize_plate(p)]
-    if not plates:
-        print("No plates configured in docs/config.json")
-    # Drop plates that were removed from the config
-    status["plates"] = {p: v for p, v in status.get("plates", {}).items() if p in plates}
 
-    for plate in plates:
-        st = status["plates"].setdefault(plate, {
-            "plate": plate, "display": pretty_plate(plate), "result": "pending",
-            "since": None, "lastNotified": None, "errors": 0, "history": [],
-        })
-        prev = st.get("result")
-        print(f"Checking {plate} ...")
+# ---------------------------------------------------------------- FSM lookup
+def _hidden_fields(page):
+    return {n: html.unescape(v) for n, v in re.findall(
+        r'<input[^>]+type="hidden"[^>]+name="([^"]+)"[^>]*value="([^"]*)"', page)}
+
+
+def _span(page, span_id):
+    m = re.search(r'<span[^>]+id="%s"[^>]*>(.*?)</span>' % re.escape(span_id), page, re.S)
+    return re.sub(r"<[^>]+>", "", html.unescape(m.group(1))).strip() if m else ""
+
+
+def lookup(plate):
+    """Return dict(result=fined|clear|unregistered|unknown, text=...)."""
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+    opener.addheaders = [
+        ("User-Agent", "Mozilla/5.0 (Macintosh) FineWatch/1.1 personal plate check"),
+        ("Accept-Language", "zh-HK,zh;q=0.9,en;q=0.8"),
+    ]
+    page = opener.open(START_URL, timeout=30).read().decode("utf-8", "replace")
+    form = _hidden_fields(page)
+    form.update({"resW": "1920", "resH": "1080", "Calculator": plate,
+                 "btnOk": "確  定", "Textbox1": ""})
+    resp = opener.open(START_URL, data=urllib.parse.urlencode(form).encode(), timeout=30)
+    result = resp.read().decode("utf-8", "replace")
+
+    if FINED_TEXT in result:
+        return {"result": "fined", "text": FINED_TEXT}
+    if "沒有登記" in result:
+        return {"result": "unregistered", "text": "輸入的車牌編號沒有登記 (plate not registered)"}
+    red = _span(result, "lbRed")
+    if "WebForm2.aspx" in resp.geturl() and red:
+        return {"result": "clear", "text": red}
+    snippet = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", result))
+    return {"result": "unknown", "text": re.sub(r"function.*", "", snippet).strip()[:160] or "Unexpected page"}
+
+
+# ---------------------------------------------------------------- ntfy
+def notify(title, message, priority=3, tags=(), with_stop=False):
+    if not TOPIC:
+        log("  (NTFY_TOPIC not set, skipping notification)")
+        return False
+    actions = [{"action": "view", "label": "Open FSM site", "url": START_URL}]
+    if with_stop:
+        actions.insert(0, {"action": "http", "label": "Stop reminders", "method": "POST",
+                           "url": f"{SERVER}/{CONTROL_TOPIC}", "body": "stop", "clear": True})
+    payload = json.dumps({"topic": TOPIC, "title": title, "message": message,
+                          "priority": priority, "tags": list(tags),
+                          "click": START_URL, "actions": actions}).encode()
+    req = urllib.request.Request(SERVER, data=payload, headers={"Content-Type": "application/json"})
+    for attempt in range(3):
         try:
-            r = lookup(plate)
+            urllib.request.urlopen(req, timeout=20).read()
+            log(f"  -> notified: {title}")
+            return True
         except Exception as e:
-            r = {"result": "error", "text": f"{type(e).__name__}: {e}"[:200]}
-        print(f"  result: {r['result']} ({r['text']})")
+            log(f"  notify attempt {attempt + 1} failed: {e}")
+            time.sleep(3)
+    return False
 
-        entry = {"at": checked_at, "result": r["result"], "text": r["text"]}
+
+def read_control(status):
+    """Return list of new control commands (stop/resume/check)."""
+    if not CONTROL_TOPIC:
+        return []
+    since = status.get("controlSince") or str(int(time.time()) - 60)
+    url = f"{SERVER}/{CONTROL_TOPIC}/json?poll=1&since={since}"
+    try:
+        lines = urllib.request.urlopen(url, timeout=15).read().decode().splitlines()
+    except Exception as e:
+        log(f"  control read failed: {e}")
+        return []
+    cmds = []
+    for line in lines:
+        try:
+            m = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if m.get("event") != "message":
+            continue
+        status["controlSince"] = m["id"]
+        word = (m.get("message") or "").strip().lower()
+        if word in ("stop", "resume", "check"):
+            cmds.append(word)
+    return cmds
+
+
+# ---------------------------------------------------------------- core
+def reminder_message(st):
+    return (f"Still showing {FINED_TEXT} (since {st['since'][:16].replace('T', ' ')} UTC). "
+            "Tap 'Stop reminders' once you've dealt with it.")
+
+
+def check_plate(plate, st, cfg, dry):
+    """Run one FSM lookup for a plate and update its state."""
+    log(f"Checking {plate} ...")
+    try:
+        r = lookup(plate)
+    except Exception as e:
+        r = {"result": "error", "text": f"{type(e).__name__}: {e}"[:200]}
+    log(f"  result: {r['result']} ({r['text']})")
+    t = iso()
+    prev_entry = (st.get("history") or [None])[0]
+    entry = {"at": t, "result": r["result"], "text": r["text"]}
+    # Collapse identical consecutive results so history stays readable
+    if prev_entry and prev_entry["result"] == r["result"]:
+        prev_entry["last"] = t
+        prev_entry["count"] = prev_entry.get("count", 1) + 1
+    else:
         st["history"] = ([entry] + st.get("history", []))[:HISTORY_LIMIT]
-        st["lastChecked"] = checked_at
-        st["lastText"] = r["text"]
-        name = st["display"]
+    st["lastChecked"] = t
+    st["lastText"] = r["text"]
 
-        if r["result"] == "unregistered":
-            st["result"] = "unregistered"
-            st["errors"] = 0
-            st["lastSuccess"] = checked_at
-            continue
-        if r["result"] in ("error", "unknown"):
-            st["errors"] = st.get("errors", 0) + 1
-            if st["errors"] == ERROR_ALERT_AFTER and not dry:
-                notify(f"⚠️ Fine Watch can't check {name}",
-                       f"The last {ERROR_ALERT_AFTER} checks failed. Last error: {r['text']}",
-                       priority="low", tags="warning")
-            continue  # keep the previous known result
+    if r["result"] in ("error", "unknown"):
+        st["errors"] = st.get("errors", 0) + 1
+        if st["errors"] == ERROR_ALERT_AFTER and not dry:
+            notify(f"⚠️ Fine Watch can't check {st['display']}",
+                   f"The last {ERROR_ALERT_AFTER} checks failed. Last error: {r['text']}",
+                   priority=2, tags=["warning"])
+        return False
 
-        st["errors"] = 0
-        changed = r["result"] != prev
-        if changed:
-            st["since"] = checked_at
-        st["result"] = r["result"]
-        st["lastSuccess"] = checked_at
+    st["errors"] = 0
+    st["lastSuccess"] = t
+    prev = st.get("result")
+    changed = r["result"] != prev
+    if changed:
+        st["since"] = t
+    st["result"] = r["result"]
 
-        if dry:
-            continue
-        if r["result"] == "fined":
-            if changed or hours_since(st.get("lastNotified")) >= remind_hours:
-                first = changed
-                title = (f"🚨 {name} 有違例紀錄 — you have a traffic fine"
-                         if first else f"⏰ Reminder: {name} still has a traffic fine")
-                msg = ("The Macau PSP site shows 有違例紀錄 (violation record) for your car. "
-                       "Tap to open the FSM site and check the details.")
-                if not first:
-                    msg = f"Still showing 有違例紀錄 since {st['since'][:10]}. " + msg
-                if notify(title, msg, priority="urgent" if first else "high",
-                          tags="rotating_light,car"):
-                    st["lastNotified"] = checked_at
-        elif r["result"] == "clear" and prev == "fined":
-            notify(f"✅ {name} is clear", "No more violation records on the FSM site. Drive safe!",
-                   tags="white_check_mark,car")
-            st["lastNotified"] = None
+    if r["result"] == "fined" and changed and not dry:
+        # New fine: alert immediately and (re)start reminders.
+        st["stopped"] = None
+        if notify(f"🚨 {st['display']} {FINED_TEXT} — you have a traffic fine",
+                  "The Macau PSP site shows a violation record for your car. "
+                  "Tap to open the FSM site. You'll be reminded until you tap 'Stop reminders'.",
+                  priority=5, tags=["rotating_light", "car"], with_stop=True):
+            st["lastNotified"] = t
+            st["reminders"] = 0
+    elif r["result"] != "fined":
+        st["lastNotified"] = None
+        st["stopped"] = None
+    return changed
 
-    status["updated"] = checked_at
-    if dry:
-        print(json.dumps(status, ensure_ascii=False, indent=2)[:1500])
+
+def maybe_remind(st, cfg, dry):
+    if dry or st.get("result") != "fined" or st.get("stopped"):
         return
+    every = float(cfg.get("remindEveryMinutes", 5))
+    if minutes_since(st.get("lastNotified")) >= every - 0.1:
+        n = st.get("reminders", 0) + 1
+        if notify(f"⏰ Reminder #{n}: {st['display']} has a traffic fine",
+                  reminder_message(st), priority=4, tags=["alarm_clock", "car"], with_stop=True):
+            st["lastNotified"] = iso()
+            st["reminders"] = n
+
+
+def git(*args):
+    return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
+
+
+def push_status():
+    git("add", "docs/status.json")
+    if git("diff", "--cached", "--quiet").returncode == 0:
+        return
+    git("commit", "-q", "-m", f"Status update {iso()}")
+    for _ in range(3):
+        pull = git("pull", "--rebase", "--autostash", "-q", "-X", "theirs")
+        if git("push", "-q").returncode == 0:
+            log("  pushed status")
+            return
+        log("  push failed, retrying", pull.stderr.strip()[:200])
+        time.sleep(5)
+
+
+def save(status):
     with open(STATUS_PATH, "w", encoding="utf-8") as f:
         json.dump(status, f, ensure_ascii=False, indent=2)
         f.write("\n")
+
+
+def main():
+    dry = os.environ.get("DRY_RUN") == "1"
+    loop_minutes = float(os.environ.get("LOOP_MINUTES", "0"))
+    use_git = os.environ.get("GIT_PUSH") == "1" and not dry
+    deadline = time.time() + loop_minutes * 60
+
+    if use_git:  # a queued run may start from an older checkout
+        git("pull", "--rebase", "--autostash", "-q", "-X", "theirs")
+    status = load_json(STATUS_PATH, {"plates": {}})
+    last_push = 0.0
+    force_check = True
+
+    while True:
+        if use_git:  # pick up plate/interval changes made from the dashboard
+            git("pull", "--rebase", "--autostash", "-q", "-X", "theirs")
+        cfg = load_json(CONFIG_PATH, {"plates": []})
+        plates = [normalize_plate(p) for p in cfg.get("plates", []) if normalize_plate(p)]
+        check_every = float(cfg.get("checkEveryMinutes", 3))
+        status["plates"] = {p: v for p, v in status.get("plates", {}).items() if p in plates}
+        status["checkEveryMinutes"] = check_every
+        status["remindEveryMinutes"] = float(cfg.get("remindEveryMinutes", 5))
+        status["running"] = loop_minutes > 0
+        dirty = False
+
+        for cmd in read_control(status):
+            log(f"  control: {cmd}")
+            dirty = True
+            if cmd == "check":
+                force_check = True
+            for st in status["plates"].values():
+                if cmd == "stop" and st.get("result") == "fined" and not st.get("stopped"):
+                    st["stopped"] = iso()
+                    if not dry:
+                        notify(f"🔕 Reminders stopped for {st['display']}",
+                               "You won't be reminded again unless the record clears and a new one appears.",
+                               priority=2, tags=["no_bell"])
+                elif cmd == "resume" and st.get("stopped"):
+                    st["stopped"] = None
+                    st["lastNotified"] = None  # remind right away
+
+        for plate in plates:
+            st = status["plates"].setdefault(plate, {
+                "plate": plate, "display": pretty_plate(plate), "result": "pending",
+                "since": None, "lastNotified": None, "stopped": None, "errors": 0, "history": []})
+            if force_check or minutes_since(st.get("lastChecked")) >= check_every - 0.1:
+                dirty |= check_plate(plate, st, cfg, dry)
+            maybe_remind(st, cfg, dry)
+
+        status["updated"] = iso()
+        if not dry:
+            save(status)
+        if use_git and (dirty or force_check or time.time() - last_push >= PUSH_EVERY_MINUTES * 60):
+            push_status()
+            last_push = time.time()
+        force_check = False
+
+        if time.time() + TICK_SECONDS >= deadline:
+            break
+        time.sleep(TICK_SECONDS)
+
+    if dry:
+        print(json.dumps(status, ensure_ascii=False, indent=2)[:1500])
+    elif use_git:
+        status["running"] = False
+        save(status)
+        push_status()
 
 
 if __name__ == "__main__":
