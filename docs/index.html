@@ -135,6 +135,9 @@ header .sp{flex:1}
 .btn.primary:hover{box-shadow:0 8px 22px rgba(0,0,0,.18)}
 .btn.ghost{background:var(--card-2);color:var(--text);border:1px solid var(--line)}
 .btn.ghost:hover{background:var(--bg2)}
+.btn.danger{background:var(--red);color:#fff}
+.btn.danger.resume{background:var(--card-2);color:var(--text);border:1px solid var(--line)}
+.btn[hidden]{display:none}
 .btn[disabled]{opacity:.5;pointer-events:none}
 .btn .spin{animation:spin 1s linear infinite}
 
@@ -156,7 +159,7 @@ header .sp{flex:1}
 .timeline .d{width:18px;height:18px;border-radius:50%;background:var(--soft);border:2px solid var(--c);margin-top:2px}
 .timeline .t{font-weight:600;font-size:14px}
 .timeline .m{color:var(--muted);font-size:12.5px}
-.timeline .w{color:var(--faint);font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.timeline .w{color:var(--faint);font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right}
 .empty{color:var(--muted);text-align:center;padding:26px 0}
 
 /* ---------- notify ---------- */
@@ -233,9 +236,10 @@ footer a{color:inherit}
         <div class="plates" id="plateTabs"></div>
         <div class="status-chip"><i></i><span id="chip">Waiting</span></div>
         <div class="headline" id="headline">Waiting for the first check</div>
-        <p class="sub" id="sub">The checker runs every 30 minutes in the cloud. Results show up here automatically.</p>
+        <p class="sub" id="sub">The checker runs every 3 minutes in the cloud. Results show up here automatically.</p>
         <div class="actions">
           <button class="btn primary" id="checkNow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg><span>Check now</span></button>
+          <button class="btn danger" id="stopBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13.7 21a2 2 0 0 1-3.4 0M18.6 13A17 17 0 0 1 18 8M6.3 6.3A6 6 0 0 0 6 8c0 7-3 9-3 9h14M18 8a6 6 0 0 0-9.3-5M2 2l20 20"/></svg><span>Stop reminders</span></button>
           <a class="btn ghost" id="fsmLink" target="_blank" rel="noopener" href="https://www.fsm.gov.mo/webticket/Webform1.aspx?carClass=L&Lang=C"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 3h7v7M21 3l-9 9M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>Open FSM site</a>
         </div>
       </div>
@@ -282,11 +286,15 @@ footer a{color:inherit}
 
   <div class="field">
     <label>Remind me again every</label>
-    <div class="seg" id="remindSeg"><button data-h="6">6 h</button><button data-h="12">12 h</button><button data-h="24">Day</button><button data-h="168">Week</button></div>
-    <div class="hint">You're always alerted the moment 有違例紀錄 first appears; this sets how often you're reminded while it stays.</div>
+    <div class="seg" id="remindSeg"><button data-h="5">5 min</button><button data-h="15">15 min</button><button data-h="60">1 h</button><button data-h="1440">1 day</button></div>
+    <div class="hint">You're alerted the moment 有違例紀錄 appears, then reminded at this interval until you tap <b>Stop reminders</b>. No record means no notifications.</div>
+  </div>
+  <div class="field">
+    <label>Check the FSM site every</label>
+    <div class="seg" id="checkSeg"><button data-m="3">3 min</button><button data-m="5">5 min</button><button data-m="10">10 min</button><button data-m="30">30 min</button></div>
   </div>
 
-  <button class="btn primary" id="saveCfg" style="width:100%;justify-content:center">Save &amp; check now</button>
+  <button class="btn primary" id="saveCfg" style="width:100%;justify-content:center">Save to GitHub</button>
   <div class="hint" id="saveHint" style="margin-top:8px;color:var(--muted);font-size:12.5px"></div>
 
   <div class="divider"></div>
@@ -299,7 +307,7 @@ footer a{color:inherit}
   <div class="field">
     <label>GitHub access key</label>
     <input type="password" id="tokenIn" placeholder="github_pat_…" autocomplete="off">
-    <div class="hint">Needed to change plates and use <b>Check now</b> from this page. Use a fine-grained token with <b>Contents</b> + <b>Actions</b> read/write on this repo only. Stored only in this browser.</div>
+    <div class="hint">Needed only to change plates or intervals from this page. Use a fine-grained token with <b>Contents</b> + <b>Actions</b> read/write on this repo only. Stored only in this browser.</div>
   </div>
   <div class="field">
     <label>Repository</label>
@@ -317,7 +325,7 @@ footer a{color:inherit}
     get(k, d = "") { try { return localStorage.getItem("fw." + k) ?? d } catch { return d } },
     set(k, v) { try { localStorage.setItem("fw." + k, v) } catch {} },
   };
-  const CHECK_EVERY_MIN = 30;
+  const CHECK_EVERY_MIN = 3;
   const FSM = "https://www.fsm.gov.mo/webticket/Webform1.aspx?carClass=L&Lang=C";
 
   // Accept settings from the link: #topic=...&repo=...
@@ -376,8 +384,8 @@ footer a{color:inherit}
   };
   const COPY = {
     fined: { chip: "有違例紀錄", head: "You have a traffic fine", sub: "The FSM site shows a violation record for this car. Open the FSM site to see the details and pay." },
-    clear: { chip: "No fines", head: "All clear", sub: "No violation records found. We'll keep watching and alert your phone the moment that changes." },
-    pending: { chip: "Waiting", head: "Waiting for the first check", sub: "The checker runs every 30 minutes in the cloud. Results show up here automatically." },
+    clear: { chip: "No fines", head: "All clear", sub: "No violation records found, so no notifications. We'll alert your phone the moment that changes." },
+    pending: { chip: "Waiting", head: "Waiting for the first check", sub: "The checker runs every 3 minutes in the cloud. Results show up here automatically." },
     unregistered: { chip: "沒有登記", head: "Plate not found", sub: "The FSM site says this plate isn't registered. Check the number in Settings." },
   };
 
@@ -409,12 +417,24 @@ footer a{color:inherit}
     $("#chip").textContent = COPY[r].chip;
     $("#headline").textContent = COPY[r].head;
     let sub = COPY[r].sub;
+    const stopBtn = $("#stopBtn");
+    stopBtn.hidden = r !== "fined";
+    if (r === "fined") {
+      const every = st.status?.remindEveryMinutes || st.config?.remindEveryMinutes || 5;
+      if (p.stopped) {
+        sub += ` Reminders are stopped (since ${fmtTime(p.stopped)}).`;
+        stopBtn.classList.add("resume"); stopBtn.querySelector("span").textContent = "Resume reminders";
+      } else {
+        sub += ` Reminding your phone every ${every} min until you stop it.`;
+        stopBtn.classList.remove("resume"); stopBtn.querySelector("span").textContent = "Stop reminders";
+      }
+    }
     if (p.errors >= 2) sub += ` (The last ${p.errors} checks couldn't reach the FSM site; showing the last known result.)`;
     $("#sub").textContent = sub;
 
     $("#sLast").textContent = ago(p.lastChecked);
     $("#sSince").textContent = fmtDate(p.since);
-    $("#sCount").textContent = (p.history || []).length;
+    $("#sCount").textContent = (p.history || []).reduce((n, e) => n + (e.count || 1), 0);
     tick();
 
     const h = (p.history || []).slice(0, 60);
@@ -425,17 +445,17 @@ footer a{color:inherit}
       <li style="--c:${color[e.result] || "var(--amber)"};--soft:${soft[e.result] || "var(--amber-soft)"};animation-delay:${Math.min(i, 10) * 40}ms">
         <span class="d"></span>
         <div><div class="t">${esc(label[e.result] || e.result)}</div>${e.result === "error" || e.result === "unknown" ? `<div class="m">${esc(e.text)}</div>` : ""}</div>
-        <span class="w">${fmtTime(e.at)}</span></li>`).join("")
+        <span class="w">${e.count > 1 ? `${fmtTime(e.at)} → ${fmtTime(e.last)}<br>×${e.count} checks` : fmtTime(e.at)}</span></li>`).join("")
       : `<li class="empty" style="display:block">No checks yet.</li>`;
   }
 
   function tick() {
     const p = current();
     if (!p.lastChecked) { $("#sNext").innerHTML = "—"; $("#sBar").style.width = "0"; return; }
-    const period = CHECK_EVERY_MIN * 60e3;
+    const period = (st.status?.checkEveryMinutes || st.config?.checkEveryMinutes || CHECK_EVERY_MIN) * 60e3;
     const elapsed = Date.now() - new Date(p.lastChecked);
     const left = period - elapsed;
-    $("#sNext").innerHTML = left > 0 ? `${Math.ceil(left / 60e3)}<small>min</small>` : `soon<small>any minute</small>`;
+    $("#sNext").innerHTML = left > 0 ? (left < 60e3 ? `${Math.ceil(left / 1e3)}<small>s</small>` : `${Math.ceil(left / 60e3)}<small>min</small>`) : `soon<small>any moment</small>`;
     $("#sBar").style.width = Math.min(100, Math.max(0, elapsed / period * 100)) + "%";
     $("#sLast").textContent = ago(p.lastChecked);
   }
@@ -491,13 +511,26 @@ footer a{color:inherit}
     btn.querySelector("svg").classList.toggle("spin", b);
     btn.querySelector("span").textContent = b ? "Checking…" : "Check now";
   }
+  async function control(word) {
+    if (!st.topic) { openDrawer(); throw new Error("Add your ntfy topic in Settings first."); }
+    const r = await fetch(`https://ntfy.sh/${encodeURIComponent(st.topic)}-control`, { method: "POST", body: word });
+    if (!r.ok) throw new Error("Couldn't reach ntfy (" + r.status + ")");
+  }
   $("#checkNow").onclick = async () => {
     try {
       setBusy(true);
-      await gh("/actions/workflows/check.yml/dispatches", { method: "POST", body: JSON.stringify({ ref: "main" }) });
-      toast("Checking the FSM site… (about 30–60 s)");
+      await control("check");
+      toast("Checking the FSM site… (usually under a minute)");
       watchForUpdate();
     } catch (e) { setBusy(false); toast(e.message); }
+  };
+  $("#stopBtn").onclick = async () => {
+    const p = current(); const resume = !!p.stopped;
+    try {
+      await control(resume ? "resume" : "stop");
+      p.stopped = resume ? null : new Date().toISOString(); render();
+      toast(resume ? "🔔 Reminders resumed" : "🔕 Reminders stopped");
+    } catch (e) { toast(e.message); }
   };
 
   // ---------- notifications ----------
@@ -526,9 +559,9 @@ footer a{color:inherit}
   };
 
   // ---------- settings drawer ----------
-  let draft = [], remind = 24;
+  let draft = [], remind = 5, checkMin = 3;
   function openDrawer() {
-    draft = plateList(); remind = Number(st.config?.remindEveryHours || 24);
+    draft = plateList(); remind = Number(st.config?.remindEveryMinutes || 5); checkMin = Number(st.config?.checkEveryMinutes || 3);
     renderDraft(); renderTopic();
     document.body.parentElement.classList.add("open");
   }
@@ -540,8 +573,10 @@ footer a{color:inherit}
     $("#plateEdit").innerHTML = draft.map((p, i) => `<div class="plate"><small>MACAU</small>${esc(pretty(p))}<button data-i="${i}" aria-label="Remove">×</button></div>`).join("");
     $("#plateEdit").querySelectorAll("button").forEach(b => b.onclick = () => { draft.splice(+b.dataset.i, 1); renderDraft(); });
     $("#remindSeg").querySelectorAll("button").forEach(b => b.classList.toggle("on", +b.dataset.h === remind));
+    $("#checkSeg").querySelectorAll("button").forEach(b => b.classList.toggle("on", +b.dataset.m === checkMin));
   }
   $("#remindSeg").onclick = e => { if (e.target.dataset.h) { remind = +e.target.dataset.h; renderDraft(); } };
+  $("#checkSeg").onclick = e => { if (e.target.dataset.m) { checkMin = +e.target.dataset.m; renderDraft(); } };
   const addPlate = () => {
     const v = norm($("#plateNew").value);
     if (v.length < 3) return toast("Enter a plate like AA8092");
@@ -563,15 +598,16 @@ footer a{color:inherit}
     const btn = $("#saveCfg"); btn.disabled = true; $("#saveHint").textContent = "Saving to GitHub…";
     try {
       const cur = await gh("/contents/docs/config.json");
-      const cfg = { plates: draft, remindEveryHours: remind };
+      const cfg = { plates: draft, checkEveryMinutes: checkMin, remindEveryMinutes: remind };
       const body = JSON.stringify(cfg, null, 2) + "\n";
       await gh("/contents/docs/config.json", {
         method: "PUT",
         body: JSON.stringify({ message: "Update watched plates", sha: cur.sha, content: btoa(unescape(encodeURIComponent(body))) }),
       });
       st.config = cfg; st.selected = draft[0]; render();
-      $("#saveHint").textContent = "Saved. A fresh check is running now.";
-      closeDrawer(); setBusy(true); toast("Saved. Checking your plates…"); watchForUpdate();
+      $("#saveHint").textContent = "Saved. The checker picks this up within ~10 minutes.";
+      try { await control("check"); } catch {}
+      closeDrawer(); toast("Saved. The checker picks this up within ~10 minutes.");
     } catch (e) { $("#saveHint").textContent = e.message; }
     btn.disabled = false;
   };
