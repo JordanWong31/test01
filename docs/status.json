@@ -5,15 +5,15 @@
       "display": "AA-80-92",
       "result": "fined",
       "since": "2026-11-19T06:25:25+00:00",
-      "lastNotified": "2026-11-19T06:53:45+00:00",
+      "lastNotified": "2026-11-19T06:57:23+00:00",
       "errors": 0,
       "history": [
         {
           "at": "2026-11-19T06:50:04+00:00",
           "result": "fined",
           "text": "有違例紀錄",
-          "last": "2026-11-19T06:53:25+00:00",
-          "count": 2
+          "last": "2026-11-19T06:56:43+00:00",
+          "count": 3
         },
         {
           "at": "2026-11-19T06:46:45+00:00",
@@ -38,16 +38,16 @@
           "text": "有違例紀錄"
         }
       ],
-      "lastChecked": "2026-11-19T06:53:25+00:00",
+      "lastChecked": "2026-11-19T06:56:43+00:00",
       "lastText": "有違例紀錄",
-      "lastSuccess": "2026-11-19T06:53:25+00:00",
-      "reminders": 4,
-      "stopped": "2026-11-19T06:56:06+00:00"
+      "lastSuccess": "2026-11-19T06:56:43+00:00",
+      "reminders": 5,
+      "stopped": null
     }
   },
-  "updated": "2026-11-19T06:56:07+00:00",
+  "updated": "2026-11-19T06:57:23+00:00",
   "checkEveryMinutes": 3.0,
   "remindEveryMinutes": 5.0,
   "running": true,
-  "controlSince": "qUXVnJlA7TDX"
+  "controlSince": "WOl0ZyYcOowt"
 }
