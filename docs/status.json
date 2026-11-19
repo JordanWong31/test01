@@ -42,12 +42,12 @@
       "lastText": "有違例紀錄",
       "lastSuccess": "2026-11-19T07:04:02+00:00",
       "reminders": 6,
-      "stopped": null
+      "stopped": "2026-11-19T07:06:05+00:00"
     }
   },
-  "updated": "2026-11-19T07:04:02+00:00",
+  "updated": "2026-11-19T07:06:05+00:00",
   "checkEveryMinutes": 3.0,
   "remindEveryMinutes": 5.0,
   "running": true,
-  "controlSince": "WOl0ZyYcOowt"
+  "controlSince": "QmGdx7xCUj1S"
 }
