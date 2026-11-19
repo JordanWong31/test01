@@ -1,4 +1,5 @@
 {
   "plates": ["AA8092"],
-  "remindEveryHours": 24
+  "checkEveryMinutes": 3,
+  "remindEveryMinutes": 5
 }
