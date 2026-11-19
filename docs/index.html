@@ -451,6 +451,11 @@ footer a{color:inherit}
 
   function tick() {
     const p = current();
+    const hours = st.status?.activeHours || st.config?.activeHours || "";
+    if (st.status?.quiet && hours) {  // overnight pause (Macau time)
+      $("#sNext").innerHTML = `${hours.split("-")[0]}<small>quiet hours · resumes</small>`;
+      $("#sBar").style.width = "0"; $("#sLast").textContent = ago(p.lastChecked); return;
+    }
     if (!p.lastChecked) { $("#sNext").innerHTML = "—"; $("#sBar").style.width = "0"; return; }
     const period = (st.status?.checkEveryMinutes || st.config?.checkEveryMinutes || CHECK_EVERY_MIN) * 60e3;
     const elapsed = Date.now() - new Date(p.lastChecked);
@@ -598,7 +603,7 @@ footer a{color:inherit}
     const btn = $("#saveCfg"); btn.disabled = true; $("#saveHint").textContent = "Saving to GitHub…";
     try {
       const cur = await gh("/contents/docs/config.json");
-      const cfg = { plates: draft, checkEveryMinutes: checkMin, remindEveryMinutes: remind };
+      const cfg = { ...(st.config || {}), plates: draft, checkEveryMinutes: checkMin, remindEveryMinutes: remind };
       const body = JSON.stringify(cfg, null, 2) + "\n";
       await gh("/contents/docs/config.json", {
         method: "PUT",
