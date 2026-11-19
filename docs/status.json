@@ -5,13 +5,20 @@
       "display": "AA-80-92",
       "result": "fined",
       "since": "2026-11-19T06:25:25+00:00",
-      "lastNotified": "2026-11-19T06:38:41+00:00",
-      "errors": 0,
+      "lastNotified": "2026-11-19T06:43:45+00:00",
+      "errors": 1,
       "history": [
+        {
+          "at": "2026-11-19T06:46:45+00:00",
+          "result": "error",
+          "text": "URLError: <urlopen error _ssl.c:994: The handshake operation timed out>"
+        },
         {
           "at": "2026-11-19T06:42:44+00:00",
           "result": "fined",
-          "text": "有違例紀錄"
+          "text": "有違例紀錄",
+          "last": "2026-11-19T06:45:53+00:00",
+          "count": 2
         },
         {
           "at": "2026-11-19T06:38:41+00:00",
@@ -24,14 +31,15 @@
           "text": "有違例紀錄"
         }
       ],
-      "lastChecked": "2026-11-19T06:42:44+00:00",
-      "lastText": "有違例紀錄",
-      "lastSuccess": "2026-11-19T06:42:44+00:00",
-      "reminders": 1
+      "lastChecked": "2026-11-19T06:46:45+00:00",
+      "lastText": "URLError: <urlopen error _ssl.c:994: The handshake operation timed out>",
+      "lastSuccess": "2026-11-19T06:45:53+00:00",
+      "reminders": 2
     }
   },
-  "updated": "2026-11-19T06:42:44+00:00",
+  "updated": "2026-11-19T06:46:45+00:00",
   "checkEveryMinutes": 3.0,
   "remindEveryMinutes": 5.0,
-  "running": true
+  "running": true,
+  "controlSince": "F4mTp2XAbcoy"
 }
