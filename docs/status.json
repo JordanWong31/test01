@@ -45,10 +45,10 @@
       "stopped": "2026-11-19T07:06:05+00:00"
     }
   },
-  "updated": "2026-11-20T21:10:24+00:00",
+  "updated": "2026-11-20T21:10:35+00:00",
   "checkEveryMinutes": 3.0,
   "remindEveryMinutes": 5.0,
-  "running": false,
+  "running": true,
   "controlSince": "QmGdx7xCUj1S",
   "activeHours": "08:00-20:30",
   "quiet": true
