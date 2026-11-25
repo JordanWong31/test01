@@ -6,14 +6,19 @@
       "result": "fined",
       "since": "2026-11-19T06:25:25+00:00",
       "lastNotified": "2026-11-19T07:03:54+00:00",
-      "errors": 4,
+      "errors": 0,
       "history": [
+        {
+          "at": "2026-11-25T11:41:22+00:00",
+          "result": "fined",
+          "text": "有違例紀錄"
+        },
         {
           "at": "2026-11-25T11:19:35+00:00",
           "result": "error",
           "text": "URLError: <urlopen error timed out>",
-          "last": "2026-11-25T11:33:18+00:00",
-          "count": 4
+          "last": "2026-11-25T11:37:53+00:00",
+          "count": 5
         },
         {
           "at": "2026-11-21T02:44:36+00:00",
@@ -69,14 +74,14 @@
           "text": "有違例紀錄"
         }
       ],
-      "lastChecked": "2026-11-25T11:33:18+00:00",
-      "lastText": "URLError: <urlopen error timed out>",
-      "lastSuccess": "2026-11-25T11:12:17+00:00",
+      "lastChecked": "2026-11-25T11:41:22+00:00",
+      "lastText": "有違例紀錄",
+      "lastSuccess": "2026-11-25T11:41:22+00:00",
       "reminders": 6,
       "stopped": "2026-11-19T07:06:05+00:00"
     }
   },
-  "updated": "2026-11-25T11:33:18+00:00",
+  "updated": "2026-11-25T11:43:25+00:00",
   "checkEveryMinutes": 3.0,
   "remindEveryMinutes": 5.0,
   "running": true,
