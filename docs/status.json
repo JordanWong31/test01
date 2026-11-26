@@ -12,8 +12,8 @@
           "at": "2026-11-25T11:41:22+00:00",
           "result": "fined",
           "text": "有違例紀錄",
-          "last": "2026-11-26T03:35:24+00:00",
-          "count": 76
+          "last": "2026-11-26T03:41:47+00:00",
+          "count": 78
         },
         {
           "at": "2026-11-25T11:19:35+00:00",
@@ -76,17 +76,17 @@
           "text": "有違例紀錄"
         }
       ],
-      "lastChecked": "2026-11-26T03:35:24+00:00",
+      "lastChecked": "2026-11-26T03:41:47+00:00",
       "lastText": "有違例紀錄",
-      "lastSuccess": "2026-11-26T03:35:24+00:00",
+      "lastSuccess": "2026-11-26T03:41:47+00:00",
       "reminders": 6,
       "stopped": "2026-11-19T07:06:05+00:00"
     }
   },
-  "updated": "2026-11-26T03:35:24+00:00",
+  "updated": "2026-11-26T03:42:28+00:00",
   "checkEveryMinutes": 3.0,
   "remindEveryMinutes": 5.0,
-  "running": true,
+  "running": false,
   "controlSince": "QmGdx7xCUj1S",
   "activeHours": "08:00-20:30",
   "quiet": false
