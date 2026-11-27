@@ -9,11 +9,21 @@
       "errors": 0,
       "history": [
         {
+          "at": "2026-11-27T04:03:50+00:00",
+          "result": "fined",
+          "text": "有違例紀錄"
+        },
+        {
+          "at": "2026-11-27T04:02:38+00:00",
+          "result": "error",
+          "text": "URLError: <urlopen error [Errno 111] Connection refused>"
+        },
+        {
           "at": "2026-11-27T01:52:13+00:00",
           "result": "fined",
           "text": "有違例紀錄",
-          "last": "2026-11-27T03:52:57+00:00",
-          "count": 37
+          "last": "2026-11-27T03:56:22+00:00",
+          "count": 38
         },
         {
           "at": "2026-11-27T01:49:41+00:00",
@@ -102,14 +112,14 @@
           "text": "有違例紀錄"
         }
       ],
-      "lastChecked": "2026-11-27T03:52:57+00:00",
+      "lastChecked": "2026-11-27T04:03:50+00:00",
       "lastText": "有違例紀錄",
-      "lastSuccess": "2026-11-27T03:52:57+00:00",
+      "lastSuccess": "2026-11-27T04:03:50+00:00",
       "reminders": 6,
       "stopped": "2026-11-19T07:06:05+00:00"
     }
   },
-  "updated": "2026-11-27T03:55:20+00:00",
+  "updated": "2026-11-27T04:05:32+00:00",
   "checkEveryMinutes": 3.0,
   "remindEveryMinutes": 5.0,
   "running": true,
